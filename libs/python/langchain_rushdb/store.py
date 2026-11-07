@@ -157,8 +157,9 @@ class RushDBStore(BaseStore):
                 expires = iso(now + timedelta(minutes=minutes))
                 data = {k: v for k, v in row.items() if not k.startswith("__")}
                 data["expires_at"] = expires
-                # `records.set` (whole record) rather than `records.update`: the
-                # SDK's update sends a body RushDB Cloud does not apply.
+                # `records.set` (whole record) rather than `records.update`:
+                # rushdb 3.2.0's update sends a body the record-write API does
+                # not read (rush-db/rushdb-python#29).
                 self.client.records.set(row["__id"], data, label=self.item_label)
                 row["expires_at"] = expires
 

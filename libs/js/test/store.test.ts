@@ -100,7 +100,7 @@ describeBackends('RushDBStore', (makeClient) => {
     expect(await store.listNamespaces({ limit: 1, offset: 1 })).toEqual([['a', 'b', 'd']])
   })
 
-  // TTLs are long enough to outlast a RushDB Cloud round trip (up to ~2 s).
+  // TTLs are long enough to outlast a slow network round trip.
   const TTL_MINUTES = 0.1 // 6 s
 
   it('hides and sweeps expired items', async () => {

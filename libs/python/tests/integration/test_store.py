@@ -100,7 +100,7 @@ def test_list_namespaces(store):
     assert store.list_namespaces(limit=1, offset=1) == [("a", "b", "d")]
 
 
-# TTLs are long enough to outlast a RushDB Cloud round trip (up to ~2 s).
+# TTLs are long enough to outlast a slow network round trip.
 TTL_MINUTES = 0.1  # 6 s
 
 
