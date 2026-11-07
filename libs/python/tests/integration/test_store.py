@@ -6,6 +6,7 @@ from datetime import datetime
 import pytest
 
 from langchain_rushdb import RushDBStore
+from tests.conftest import drop_labels
 from tests.integration.test_vectorstore import KeywordEmbeddings
 
 
@@ -18,8 +19,7 @@ def store(client, unique):
         index={"dims": 4, "embed": KeywordEmbeddings(), "fields": ["text"]},
     )
     yield s
-    client.records.delete({"labels": [s.item_label]})
-    client.records.delete({"labels": [s.vector_label]})
+    drop_labels(client, s.item_label, s.vector_label)
 
 
 def test_put_get_round_trip(store):
@@ -110,7 +110,7 @@ def test_ttl_hides_and_sweeps(client, unique):
     assert store.list_namespaces() == [("t",)]
     assert store.sweep() == 1
     assert client.records.find({"labels": [store.item_label]}).total == 1
-    client.records.delete({"labels": [store.item_label]})
+    drop_labels(client, store.item_label)
 
 
 def test_ttl_refresh_on_read(client, unique):
@@ -119,7 +119,7 @@ def test_ttl_refresh_on_read(client, unique):
     for _ in range(3):
         time.sleep(0.3)
         assert store.get(("t",), "k") is not None
-    client.records.delete({"labels": [store.item_label]})
+    drop_labels(client, store.item_label)
 
 
 async def test_async_batch(store):

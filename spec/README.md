@@ -104,6 +104,14 @@ Store filters keep LangGraph's semantics (number coercion, nested objects,
 scalars; every other condition runs in the client after the namespace
 narrowing.
 
+Each package follows its own framework's in-memory store, so client-side
+operators differ by language: Python supports `$eq $ne $gt $gte $lt $lte`
+(LangGraph); JavaScript also supports `$in $nin` (LangGraph.js). TTL is per call
+in Python (`put(..., ttl=)`) and per store in JavaScript (`ttl.defaultTtl`):
+LangGraph.js's `put` takes no TTL. For the `$` field (whole value), the
+embedded text is the framework's own rendering of the value. So the same item
+embeds identically within one language only.
+
 Item: label `LG_STORE_ITEM` (configurable)
 
 | Property | Type | Content |

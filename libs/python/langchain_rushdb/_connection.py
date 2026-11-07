@@ -115,27 +115,31 @@ def transact(
         return
     for attempt in range(CONFLICT_RETRIES):
         tx = client.tx.begin()
+        committing = False
         try:
             for record in delete:
                 client.records.delete_by_id(record, transaction=tx)
             for label, rows in create:
                 create_rows(client, label, rows, transaction=tx)
-            tx.commit()
+            committing = True
+            client.tx.commit(tx)
             return
-        except RushDBError as exc:
-            _rollback(tx, exc)
-            if "transaction_conflict" not in str(exc) or attempt == CONFLICT_RETRIES - 1:
+        except BaseException as exc:
+            # A failed commit has already ended the transaction.
+            if not committing:
+                _rollback(client, tx, exc)
+            if (
+                not isinstance(exc, RushDBError)
+                or "transaction_conflict" not in str(exc)
+                or attempt == CONFLICT_RETRIES - 1
+            ):
                 raise
             time.sleep(0.02 * 2**attempt * (1 + random.random()))
-        except BaseException as exc:
-            _rollback(tx, exc)
-            raise
 
 
-def _rollback(tx: Any, cause: BaseException) -> None:
-    """Roll back after ``cause``; a commit that failed already ended the transaction."""
+def _rollback(client: RushDB, tx: Any, cause: BaseException) -> None:
     try:
-        tx.rollback()
+        client.tx.rollback(tx)
     except RushDBError as exc:
         logger.warning("rollback after %r also failed: %s", cause, exc)
 
@@ -188,7 +192,9 @@ def iso(dt: datetime) -> str:
 
 
 def parse_iso(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    """Parse an engine datetime; the engine may echo midnight as a bare date."""
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 def now_iso() -> str:
