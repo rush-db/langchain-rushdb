@@ -76,6 +76,20 @@ jobs:
         run: |
           version=$(node -p "require('./package.json').version")
           test "js-v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != js-v$version" >&2; exit 1; }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: npm publish --access public
+      # The first version of a package is published by hand (npm offers
+      # trusted publishing only for existing packages): its tag then has
+      # nothing left to publish.
+      - name: Skip a version already on npm
+        id: published
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@rushdb/langchain@$version" version >/dev/null 2>&1; then
+            echo "@rushdb/langchain@$version is already on npm"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.published.outputs.skip != 'true'
+        run: pnpm build
+      - if: steps.published.outputs.skip != 'true'
+        run: npm publish --access public
