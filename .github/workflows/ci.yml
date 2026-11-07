@@ -47,6 +47,9 @@ jobs:
       - name: Test (every backend required)
         env:
           RUSHDB_TEST_LABEL_SUFFIX: PY${{ matrix.python }}
+          # One Python version covers RushDB Cloud; two concurrent suites on one
+          # Cloud project only contend with each other.
+          RUSHDB_TEST_API_KEY: ${{ matrix.python == '3.13' && secrets.RUSHDB_TEST_API_KEY || '' }}
         run: |
           export RUSHDB_TEST_LABEL_SUFFIX=${RUSHDB_TEST_LABEL_SUFFIX//./}
           export RUSHDB_TEST_REQUIRE=self_hosted,self_hosted_multitenant${RUSHDB_TEST_API_KEY:+,cloud}
