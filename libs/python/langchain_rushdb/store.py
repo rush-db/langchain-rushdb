@@ -155,9 +155,11 @@ class RushDBStore(BaseStore):
             minutes = row.get("ttl_minutes")
             if isinstance(minutes, (int, float)):
                 expires = iso(now + timedelta(minutes=minutes))
-                self.client.records.update(
-                    row["__id"], {"expires_at": expires}, label=self.item_label
-                )
+                data = {k: v for k, v in row.items() if not k.startswith("__")}
+                data["expires_at"] = expires
+                # `records.set` (whole record) rather than `records.update`: the
+                # SDK's update sends a body RushDB Cloud does not apply.
+                self.client.records.set(row["__id"], data, label=self.item_label)
                 row["expires_at"] = expires
 
     # ── put / delete ───────────────────────────────────────────────────────

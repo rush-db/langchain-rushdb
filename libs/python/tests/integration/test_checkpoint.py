@@ -37,8 +37,12 @@ async def test_conformance(client):
 
     report = await validate(saver)
     report.print_report()
-    assert report.passed_all_base()
-    assert report.passed_all()
+    failures = [
+        f"{capability}: {failure}"
+        for capability, result in report.results.items()
+        for failure in result.failures
+    ]
+    assert report.passed_all(), "\n".join(failures)
 
 
 class State(TypedDict):
