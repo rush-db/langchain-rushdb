@@ -31,9 +31,7 @@ import {
   unb64
 } from './connection.js'
 
-export const CHECKPOINT = 'LG_CHECKPOINT'
-export const BLOB = 'LG_CHECKPOINT_BLOB'
-export const WRITE = 'LG_CHECKPOINT_WRITE'
+export const DEFAULT_LABEL = 'LG_CHECKPOINT'
 const METADATA_PREFIX = 'metadata'
 
 export interface RushDBSaverConfig {
@@ -41,22 +39,34 @@ export interface RushDBSaverConfig {
   client?: Client
   /** The serializer; LangGraph's default when omitted. */
   serde?: SerializerProtocol
+  /**
+   * Label of checkpoint records; channel values and pending writes use
+   * `<label>_BLOB` and `<label>_WRITE`. Separate labels keep separate
+   * applications in one RushDB project apart.
+   */
+  label?: string
 }
 
 /**
  * LangGraph checkpointer on RushDB, Cloud or self-hosted alike.
  *
  * Checkpoints, channel values and pending writes are records of
- * `LG_CHECKPOINT`, `LG_CHECKPOINT_BLOB` and `LG_CHECKPOINT_WRITE` (see the
+ * `<label>`, `<label>_BLOB` and `<label>_WRITE` (see the
  * repository's `spec/README.md`); serialized bytes are stored base64-encoded.
  * Each `put` and `putWrites` is one RushDB transaction.
  */
 export class RushDBSaver extends BaseCheckpointSaver {
   readonly client: Client
+  readonly label: string
+  readonly blobLabel: string
+  readonly writeLabel: string
 
   constructor(config: RushDBSaverConfig = {}) {
     super(config.serde)
     this.client = config.client ?? clientFromEnv()
+    this.label = config.label ?? DEFAULT_LABEL
+    this.blobLabel = `${this.label}_BLOB`
+    this.writeLabel = `${this.label}_WRITE`
   }
 
   // ── reads ──────────────────────────────────────────────────────────────
@@ -69,7 +79,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
     }
     if (configurable.checkpoint_id) where.checkpoint_id = configurable.checkpoint_id
     const page = await this.client.records.find({
-      labels: [CHECKPOINT],
+      labels: [this.label],
       where,
       orderBy: { checkpoint_id: 'desc' },
       limit: 1
@@ -93,7 +103,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
     const [pushed, pushedAll] = metadataPushdown(filter)
     Object.assign(where, pushed)
     const exact = pushedAll && beforeId === undefined
-    const search: Row = { labels: [CHECKPOINT], orderBy: { checkpoint_id: 'desc' } }
+    const search: Row = { labels: [this.label], orderBy: { checkpoint_id: 'desc' } }
     if (Object.keys(where).length) search.where = where
     let rows: Row[]
     if (exact && limit !== undefined) {
@@ -174,7 +184,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
     if (!channels.length) return {}
     const wanted = new Set(channels.map((c) => JSON.stringify([c, String(versions[c])])))
     const rows = await findAll(this.client, {
-      labels: [BLOB],
+      labels: [this.blobLabel],
       where: { thread_id: threadId, checkpoint_ns: checkpointNs, channel: { $in: channels.sort() } }
     })
     const values: Record<string, unknown> = {}
@@ -191,7 +201,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
     checkpointId: string
   ): Promise<CheckpointPendingWrite[]> {
     const rows = await findAll(this.client, {
-      labels: [WRITE],
+      labels: [this.writeLabel],
       where: { thread_id: threadId, checkpoint_ns: checkpointNs, checkpoint_id: checkpointId }
     })
     rows.sort((a, b) =>
@@ -230,7 +240,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
       channels.length
         ? (
             await findAll(this.client, {
-              labels: [BLOB],
+              labels: [this.blobLabel],
               where: { thread_id: threadId, checkpoint_ns: checkpointNs, channel: { $in: [...channels].sort() } }
             })
           ).map((r) => JSON.stringify([r.channel, r.version]))
@@ -266,13 +276,13 @@ export class RushDBSaver extends BaseCheckpointSaver {
     if (parentId) record.parent_checkpoint_id = parentId
     const replaced = (
       await findAll(this.client, {
-        labels: [CHECKPOINT],
+        labels: [this.label],
         where: { thread_id: threadId, checkpoint_ns: checkpointNs, checkpoint_id: checkpoint.id }
       })
     ).map((r) => r.__id as string)
     await transact(this.client, replaced, [
-      [BLOB, blobs],
-      [CHECKPOINT, [record]]
+      [this.blobLabel, blobs],
+      [this.label, [record]]
     ])
     return { configurable: { thread_id: threadId, checkpoint_ns: checkpointNs, checkpoint_id: checkpoint.id } }
   }
@@ -290,7 +300,7 @@ export class RushDBSaver extends BaseCheckpointSaver {
     const checkpointId: string = configurable.checkpoint_id
     const existing = new Map<number, string>()
     for (const r of await findAll(this.client, {
-      labels: [WRITE],
+      labels: [this.writeLabel],
       where: { thread_id: threadId, checkpoint_ns: checkpointNs, checkpoint_id: checkpointId, task_id: taskId }
     })) {
       existing.set(Number(r.idx), r.__id as string)
@@ -317,11 +327,11 @@ export class RushDBSaver extends BaseCheckpointSaver {
         blob: b64(data)
       })
     }
-    await transact(this.client, replaced, [[WRITE, rows]])
+    await transact(this.client, replaced, [[this.writeLabel, rows]])
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    for (const label of [CHECKPOINT, BLOB, WRITE]) {
+    for (const label of [this.label, this.blobLabel, this.writeLabel]) {
       await this.client.records.delete({ labels: [label], where: { thread_id: String(threadId) } } as any)
     }
   }
@@ -330,12 +340,12 @@ export class RushDBSaver extends BaseCheckpointSaver {
   async deleteForRuns(runIds: string[]): Promise<void> {
     if (!runIds.length) return
     const rows = await findAll(this.client, {
-      labels: [CHECKPOINT],
+      labels: [this.label],
       where: { [`${METADATA_PREFIX}.run_id`]: { $in: runIds.map(String) } }
     })
     for (const row of rows) {
       await this.client.records.delete({
-        labels: [WRITE],
+        labels: [this.writeLabel],
         where: {
           thread_id: row.thread_id,
           checkpoint_ns: row.checkpoint_ns,

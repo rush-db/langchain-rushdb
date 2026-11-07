@@ -6,20 +6,21 @@ from datetime import datetime
 import pytest
 
 from langchain_rushdb import RushDBStore
-from tests.conftest import drop_labels
+from tests.conftest import clear_labels, label
 from tests.integration.test_vectorstore import KeywordEmbeddings
 
 
 @pytest.fixture
-def store(client, unique):
+def store(client):
     s = RushDBStore(
         client=client,
-        item_label=f"LG_ITEM_{unique}",
-        vector_label=f"LG_VEC_{unique}",
+        item_label=label("LG_ITEM"),
+        vector_label=label("LG_VEC"),
         index={"dims": 4, "embed": KeywordEmbeddings(), "fields": ["text"]},
     )
+    clear_labels(client, s.item_label, s.vector_label)
     yield s
-    drop_labels(client, s.item_label, s.vector_label)
+    clear_labels(client, s.item_label, s.vector_label)
 
 
 def test_put_get_round_trip(store):
@@ -99,27 +100,37 @@ def test_list_namespaces(store):
     assert store.list_namespaces(limit=1, offset=1) == [("a", "b", "d")]
 
 
-def test_ttl_hides_and_sweeps(client, unique):
-    store = RushDBStore(client=client, item_label=f"LG_TTL_{unique}", ttl={"default_ttl": 0.002})
+# TTLs are long enough to outlast a slow network round trip.
+TTL_MINUTES = 0.1  # 6 s
+
+
+def test_ttl_hides_and_sweeps(client):
+    store = RushDBStore(client=client, item_label=label("LG_TTL"), ttl={"default_ttl": TTL_MINUTES})
+    clear_labels(client, store.item_label)
     store.put(("t",), "short", {"v": 1})
     store.put(("t",), "long", {"v": 2}, ttl=None)
     assert store.get(("t",), "short", refresh_ttl=False) is not None
-    time.sleep(0.3)
+    time.sleep(TTL_MINUTES * 60 + 1)
     assert store.get(("t",), "short") is None
     assert [i.key for i in store.search(("t",))] == ["long"]
     assert store.list_namespaces() == [("t",)]
     assert store.sweep() == 1
     assert client.records.find({"labels": [store.item_label]}).total == 1
-    drop_labels(client, store.item_label)
+    clear_labels(client, store.item_label)
 
 
-def test_ttl_refresh_on_read(client, unique):
-    store = RushDBStore(client=client, item_label=f"LG_TTLR_{unique}", ttl={"default_ttl": 0.01})
+def test_ttl_refresh_on_read(client):
+    store = RushDBStore(
+        client=client, item_label=label("LG_TTLR"), ttl={"default_ttl": TTL_MINUTES}
+    )
+    clear_labels(client, store.item_label)
     store.put(("t",), "k", {"v": 1})
+    # Three reads TTL * 2/3 apart: 12 s in all, twice the TTL, so only the
+    # refreshes keep the item alive.
     for _ in range(3):
-        time.sleep(0.3)
+        time.sleep(TTL_MINUTES * 60 * 2 / 3)
         assert store.get(("t",), "k") is not None
-    drop_labels(client, store.item_label)
+    clear_labels(client, store.item_label)
 
 
 async def test_async_batch(store):

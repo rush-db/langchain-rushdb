@@ -2,25 +2,25 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { RushDBStore } from '../src/index.js'
-import { describeBackends, dropLabels, unique } from './backends.js'
+import { clearLabels, describeBackends, label } from './backends.js'
 import { KeywordEmbeddings } from './keyword-embeddings.js'
 import { sleep } from '../src/connection.js'
 
 describeBackends('RushDBStore', (makeClient) => {
   let store: RushDBStore
 
-  beforeEach(() => {
-    const id = unique()
+  beforeEach(async () => {
     store = new RushDBStore({
       client: makeClient(),
-      itemLabel: `LG_ITEM_${id}`,
-      vectorLabel: `LG_VEC_${id}`,
+      itemLabel: label('LG_ITEM'),
+      vectorLabel: label('LG_VEC'),
       index: { dims: 4, embeddings: new KeywordEmbeddings(), fields: ['text'] }
     })
+    await clearLabels(store.client, store.itemLabel, store.vectorLabel)
   })
 
   afterEach(async () => {
-    await dropLabels(store.client, store.itemLabel, store.vectorLabel)
+    await clearLabels(store.client, store.itemLabel, store.vectorLabel)
   })
 
   it('round-trips put and get', async () => {
@@ -100,16 +100,19 @@ describeBackends('RushDBStore', (makeClient) => {
     expect(await store.listNamespaces({ limit: 1, offset: 1 })).toEqual([['a', 'b', 'd']])
   })
 
+  // TTLs are long enough to outlast a slow network round trip.
+  const TTL_MINUTES = 0.1 // 6 s
+
   it('hides and sweeps expired items', async () => {
     const ttlStore = new RushDBStore({
       client: store.client,
       itemLabel: store.itemLabel,
-      ttl: { defaultTtl: 0.002, refreshOnRead: false }
+      ttl: { defaultTtl: TTL_MINUTES, refreshOnRead: false }
     })
     await ttlStore.put(['t'], 'short', { v: 1 })
     await store.put(['t'], 'long', { v: 2 })
     expect(await ttlStore.get(['t'], 'short')).not.toBeNull()
-    await sleep(300)
+    await sleep(TTL_MINUTES * 60_000 + 1000)
     expect(await ttlStore.get(['t'], 'short')).toBeNull()
     expect((await ttlStore.search(['t'])).map((i) => i.key)).toEqual(['long'])
     expect(await ttlStore.listNamespaces()).toEqual([['t']])
@@ -118,10 +121,16 @@ describeBackends('RushDBStore', (makeClient) => {
   })
 
   it('refreshes TTL on read', async () => {
-    const ttlStore = new RushDBStore({ client: store.client, itemLabel: store.itemLabel, ttl: { defaultTtl: 0.01 } })
+    const ttlStore = new RushDBStore({
+      client: store.client,
+      itemLabel: store.itemLabel,
+      ttl: { defaultTtl: TTL_MINUTES }
+    })
     await ttlStore.put(['t'], 'k', { v: 1 })
+    // Three reads TTL * 2/3 apart: twice the TTL in all, so only the refreshes
+    // keep the item alive.
     for (let i = 0; i < 3; i += 1) {
-      await sleep(300)
+      await sleep((TTL_MINUTES * 60_000 * 2) / 3)
       expect(await ttlStore.get(['t'], 'k')).not.toBeNull()
     }
   })

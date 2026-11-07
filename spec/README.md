@@ -32,7 +32,8 @@ answers, under its rules:
   `$vectors`. Type inference changes only ISO-8601 strings, which become
   datetimes. Values are always read back from the JSON copy.
 - A transaction refused with `transaction_conflict` (concurrent writers) is
-  retried with exponential backoff, up to 8 attempts.
+  retried with exponential backoff (50 ms doubling, capped at 2 s, with jitter),
+  up to 10 attempts.
 - The engine's `$gt`/`$gte`/`$lt`/`$lte` compare numbers and datetimes, not
   strings. Orderings on string ids are applied in the client.
 
@@ -147,6 +148,10 @@ base64-encoded (standard alphabet) next to their type. Checkpoints written by
 one language are read by the same language. The record layout, not the
 serialization, is shared: either package can list, count and delete any
 thread.
+
+The checkpoint label is configurable; channel values and pending writes
+always use `<label>_BLOB` and `<label>_WRITE`. The labels below are the
+defaults.
 
 Checkpoint: label `LG_CHECKPOINT`
 

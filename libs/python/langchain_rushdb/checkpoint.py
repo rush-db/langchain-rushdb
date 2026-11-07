@@ -24,9 +24,7 @@ from rushdb import RushDB
 
 from ._connection import b64, client_from_env, delete_ids, find_all, mirror, transact, unb64
 
-CHECKPOINT = "LG_CHECKPOINT"
-BLOB = "LG_CHECKPOINT_BLOB"
-WRITE = "LG_CHECKPOINT_WRITE"
+DEFAULT_LABEL = "LG_CHECKPOINT"
 METADATA_PREFIX = "metadata"
 
 
@@ -34,7 +32,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
     """LangGraph checkpointer on RushDB, Cloud or self-hosted alike.
 
     Checkpoints, channel values and pending writes are records of
-    ``LG_CHECKPOINT``, ``LG_CHECKPOINT_BLOB`` and ``LG_CHECKPOINT_WRITE`` (see the
+    ``<label>``, ``<label>_BLOB`` and ``<label>_WRITE`` (see the
     repository's ``spec/README.md``); serialized bytes are stored base64-encoded.
     Each ``put`` and ``put_writes`` is one RushDB transaction.
 
@@ -43,6 +41,9 @@ class RushDBSaver(BaseCheckpointSaver[str]):
     Args:
         client: A ``rushdb.RushDB`` client; built from the environment when omitted.
         serde: The serializer; LangGraph's default when omitted.
+        label: Label of checkpoint records; channel values and pending writes
+            use ``<label>_BLOB`` and ``<label>_WRITE``. Separate labels keep
+            separate applications in one RushDB project apart.
     """
 
     def __init__(
@@ -50,9 +51,13 @@ class RushDBSaver(BaseCheckpointSaver[str]):
         *,
         client: RushDB | None = None,
         serde: SerializerProtocol | None = None,
+        label: str = DEFAULT_LABEL,
     ) -> None:
         super().__init__(serde=serde)
         self.client = client if client is not None else client_from_env()
+        self.label = label
+        self.blob_label = f"{label}_BLOB"
+        self.write_label = f"{label}_WRITE"
 
     # ── reads ──────────────────────────────────────────────────────────────
 
@@ -65,7 +70,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
             where["checkpoint_id"] = checkpoint_id
         page = self.client.records.find(
             {
-                "labels": [CHECKPOINT],
+                "labels": [self.label],
                 "where": where,
                 "orderBy": {"checkpoint_id": "desc"},
                 "limit": 1,
@@ -99,7 +104,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
         exact = exact and before_id is None
         where.update(pushed)
         search: dict[str, Any] = {
-            "labels": [CHECKPOINT],
+            "labels": [self.label],
             "orderBy": {"checkpoint_id": "desc"},
         }
         if where:
@@ -173,7 +178,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
         rows = find_all(
             self.client,
             {
-                "labels": [BLOB],
+                "labels": [self.blob_label],
                 "where": {
                     "thread_id": thread_id,
                     "checkpoint_ns": checkpoint_ns,
@@ -197,7 +202,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
             find_all(
                 self.client,
                 {
-                    "labels": [WRITE],
+                    "labels": [self.write_label],
                     "where": {
                         "thread_id": thread_id,
                         "checkpoint_ns": checkpoint_ns,
@@ -238,7 +243,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
                 for r in find_all(
                     self.client,
                     {
-                        "labels": [BLOB],
+                        "labels": [self.blob_label],
                         "where": {
                             "thread_id": thread_id,
                             "checkpoint_ns": checkpoint_ns,
@@ -287,7 +292,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
             for r in find_all(
                 self.client,
                 {
-                    "labels": [CHECKPOINT],
+                    "labels": [self.label],
                     "where": {
                         "thread_id": thread_id,
                         "checkpoint_ns": checkpoint_ns,
@@ -296,7 +301,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
                 },
             )
         ]
-        transact(self.client, replaced, [(BLOB, blobs), (CHECKPOINT, [record])])
+        transact(self.client, replaced, [(self.blob_label, blobs), (self.label, [record])])
         return {
             "configurable": {
                 "thread_id": thread_id,
@@ -321,7 +326,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
             for r in find_all(
                 self.client,
                 {
-                    "labels": [WRITE],
+                    "labels": [self.write_label],
                     "where": {
                         "thread_id": thread_id,
                         "checkpoint_ns": checkpoint_ns,
@@ -353,10 +358,10 @@ class RushDBSaver(BaseCheckpointSaver[str]):
                     "blob": b64(data),
                 }
             )
-        transact(self.client, replaced, [(WRITE, rows)])
+        transact(self.client, replaced, [(self.write_label, rows)])
 
     def delete_thread(self, thread_id: str) -> None:
-        for label in (CHECKPOINT, BLOB, WRITE):
+        for label in (self.label, self.blob_label, self.write_label):
             self.client.records.delete({"labels": [label], "where": {"thread_id": str(thread_id)}})
 
     def delete_for_runs(self, run_ids: Sequence[str]) -> None:
@@ -368,7 +373,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
             find_all(
                 self.client,
                 {
-                    "labels": [CHECKPOINT],
+                    "labels": [self.label],
                     "where": {f"{METADATA_PREFIX}.run_id": {"$in": [str(r) for r in run_ids]}},
                 },
             )
@@ -376,7 +381,7 @@ class RushDBSaver(BaseCheckpointSaver[str]):
         for row in rows:
             self.client.records.delete(
                 {
-                    "labels": [WRITE],
+                    "labels": [self.write_label],
                     "where": {
                         "thread_id": row["thread_id"],
                         "checkpoint_ns": row["checkpoint_ns"],

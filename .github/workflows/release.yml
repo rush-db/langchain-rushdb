@@ -1,0 +1,95 @@
+name: Release
+
+# Publishes one package per tag, with trusted publishing (OIDC): no PyPI or
+# npm token is stored. The tag must match the package version.
+#
+#   python-v0.1.0  ->  langchain-rushdb 0.1.0 on PyPI   (libs/python/pyproject.toml)
+#   js-v0.1.0      ->  @rushdb/langchain 0.1.0 on npm   (libs/js/package.json)
+#
+# One-time setup:
+#   PyPI: add a (pending) trusted publisher for project `langchain-rushdb`:
+#         owner rush-db, repository langchain-rushdb, workflow release.yml,
+#         environment pypi.
+#   npm:  Package -> Settings -> Trusted publishing for `@rushdb/langchain`:
+#         GitHub Actions, organization rush-db, repository langchain-rushdb,
+#         workflow release.yml. npm only offers this once the package exists,
+#         so the very first version is published by hand (see README).
+
+on:
+  push:
+    tags: ['python-v*', 'js-v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  pypi:
+    if: startsWith(github.ref_name, 'python-v')
+    needs: test
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: libs/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Tag matches the package version
+        run: |
+          version=$(uv version --short)
+          test "python-v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != python-v$version" >&2; exit 1; }
+      - run: uv build
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: libs/python/dist
+
+  npm:
+    if: startsWith(github.ref_name, 'js-v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: libs/js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+      # Deliberately no `registry-url`: setup-node would write an empty
+      # `_authToken` line that shadows the OIDC exchange.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: libs/js/pnpm-lock.yaml
+      # Trusted publishing needs npm >= 11.5.1; Node 22 ships npm 10.x.
+      - run: npm install -g npm@^11.5.1
+      - name: Tag matches the package version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          test "js-v$version" = "$GITHUB_REF_NAME" || { echo "tag $GITHUB_REF_NAME != js-v$version" >&2; exit 1; }
+      # The first version of a package is published by hand (npm offers
+      # trusted publishing only for existing packages): its tag then has
+      # nothing left to publish.
+      - name: Skip a version already on npm
+        id: published
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if npm view "@rushdb/langchain@$version" version >/dev/null 2>&1; then
+            echo "@rushdb/langchain@$version is already on npm"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.published.outputs.skip != 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.published.outputs.skip != 'true'
+        run: pnpm build
+      - if: steps.published.outputs.skip != 'true'
+        run: npm publish --access public

@@ -1,12 +1,13 @@
 /** Client construction and the record helpers every component shares. */
-import RushDB from '@rushdb/javascript-sdk'
+import RushDB, { type Transaction } from '@rushdb/javascript-sdk'
 
 export type Client = InstanceType<typeof RushDB>
 export type Row = Record<string, any>
 
 export const PAGE_SIZE = 1000
 export const FAR_FUTURE = '9999-12-31T23:59:59.000Z'
-export const CONFLICT_RETRIES = 8
+export const CONFLICT_RETRIES = 10
+const CONFLICT_BACKOFF_CAP_MS = 2000
 
 /**
  * Build a RushDB client from the environment.
@@ -91,8 +92,6 @@ export async function transact(
 ): Promise<void> {
   if (!remove.length && !create.some(([, rows]) => rows.length)) return
   for (let attempt = 0; attempt < CONFLICT_RETRIES; attempt += 1) {
-    // Commit and roll back through `client`: the SDK's `Transaction` methods
-    // use the most recently created client, not the one that began it.
     const tx = await client.tx.begin()
     let committing = false
     try {
@@ -106,14 +105,14 @@ export async function transact(
       if (!committing) await rollback(client, tx, error)
       const conflict = String((error as Error)?.message ?? error).includes('transaction_conflict')
       if (!conflict || attempt === CONFLICT_RETRIES - 1) throw error
-      await sleep(20 * 2 ** attempt * (1 + Math.random()))
+      await sleep(Math.min(CONFLICT_BACKOFF_CAP_MS, 50 * 2 ** attempt) * (1 + Math.random()))
     }
   }
 }
 
-async function rollback(client: Client, tx: unknown, cause: unknown): Promise<void> {
+async function rollback(client: Client, tx: Transaction, cause: unknown): Promise<void> {
   try {
-    await client.tx.rollback(tx as never)
+    await client.tx.rollback(tx)
   } catch (error) {
     console.warn(`[@rushdb/langchain] rollback after ${String(cause)} also failed: ${String(error)}`)
   }

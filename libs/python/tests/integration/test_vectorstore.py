@@ -5,7 +5,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
 from langchain_rushdb import FilterError, RushDBHybridRetriever, RushDBVectorStore
-from tests.conftest import drop_labels
+from tests.conftest import clear_labels, label
 
 
 class KeywordEmbeddings(Embeddings):
@@ -46,17 +46,18 @@ DOCS = [
 
 
 @pytest.fixture
-def store(client, unique):
+def store(client):
     s = RushDBVectorStore(
         KeywordEmbeddings(),
         client=client,
-        label=f"LC_VS_{unique}",
+        label=label("LC_VS"),
         hybrid=True,
         text_index_consistency="immediate",
     )
+    clear_labels(client, s.label)
     s.add_documents(DOCS)
     yield s
-    drop_labels(client, s.label)
+    clear_labels(client, s.label)
 
 
 def test_metadata_round_trip(store):
@@ -107,11 +108,10 @@ def test_hybrid_retriever_filter(store):
     assert [d.id for d in retriever.invoke("graph")] == ["d3"]
 
 
-def test_hybrid_needs_text_index(client, unique):
-    plain = RushDBVectorStore(KeywordEmbeddings(), client=client, label=f"LC_NH_{unique}")
+def test_hybrid_needs_text_index(client):
+    plain = RushDBVectorStore(KeywordEmbeddings(), client=client, label=label("LC_NH"))
     with pytest.raises(ValueError, match="hybrid=True"):
         RushDBHybridRetriever(vectorstore=plain).invoke("x")
-    drop_labels(client, plain.label)
 
 
 def test_as_retriever(store):
