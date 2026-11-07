@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  RUSHDB_IMAGE: rushdb/rushdb:3.0.4
+  RUSHDB_TEST_ENGINE_URL: http://127.0.0.1:3917
+  RUSHDB_TEST_ENGINE_TOKEN: ci-token
+  RUSHDB_TEST_MT_ENGINE_URL: http://127.0.0.1:3918
+  RUSHDB_TEST_MT_ENGINE_TOKEN: ci-token
+  # RushDB Cloud runs when the secret is set; then it is required like the rest.
+  RUSHDB_TEST_API_KEY: ${{ secrets.RUSHDB_TEST_API_KEY }}
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.13']
+    defaults:
+      run:
+        working-directory: libs/python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Start RushDB engines
+        working-directory: .
+        run: scripts/start-engines.sh
+      - run: uv sync --python ${{ matrix.python }} --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy langchain_rushdb
+      - name: Test (every backend required)
+        run: |
+          export RUSHDB_TEST_REQUIRE=self_hosted,self_hosted_multitenant${RUSHDB_TEST_API_KEY:+,cloud}
+          uv run pytest -q
+
+  js:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libs/js
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: libs/js/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v6
+      - name: Start RushDB engines
+        working-directory: .
+        run: scripts/start-engines.sh
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm types:check
+      - name: Test (every backend required)
+        run: |
+          export RUSHDB_TEST_REQUIRE=self_hosted,self_hosted_multitenant${RUSHDB_TEST_API_KEY:+,cloud}
+          pnpm test
