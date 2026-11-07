@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "prefix": "value",
+  "cases": [
+    {"name": "scalars", "object": {"s": "x", "n": 1.5, "i": 3, "b": true}, "properties": {"value.s": "x", "value.n": 1.5, "value.i": 3, "value.b": true}},
+    {"name": "flat arrays", "object": {"tags": ["a", "b"], "nums": [1, 2]}, "properties": {"value.tags": ["a", "b"], "value.nums": [1, 2]}},
+    {"name": "not mirrored", "object": {"o": {"x": 1}, "z": null, "e": [], "m": [1, "a"], "lo": [{"x": 1}], "bm": [true, 1]}, "properties": {}},
+    {"name": "empty string is mirrored", "object": {"s": ""}, "properties": {"value.s": ""}}
+  ]
+}

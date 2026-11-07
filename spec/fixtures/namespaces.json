@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "cases": [
+    {"namespace": ["users"], "ns": "users", "depth": 1},
+    {"namespace": ["users", "u1", "memories"], "ns": "users.u1.memories", "depth": 3}
+  ],
+  "prefixWhere": [
+    {"prefix": [], "where": {}},
+    {"prefix": ["users"], "where": {"$or": [{"ns": "users"}, {"ns": {"$startsWith": "users."}}]}},
+    {"prefix": ["users", "u1"], "where": {"$or": [{"ns": "users.u1"}, {"ns": {"$startsWith": "users.u1."}}]}}
+  ],
+  "relevance": [
+    {"similarity": "cosine", "score": 1.0, "relevance": 1.0},
+    {"similarity": "cosine", "score": 0.0, "relevance": 0.5},
+    {"similarity": "cosine", "score": -1.0, "relevance": 0.0},
+    {"similarity": "dot", "score": 0.0, "relevance": 0.5},
+    {"similarity": "euclidean", "score": 0.25, "relevance": 0.25}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "prefix": "metadata",
+  "cases": [
+    {"name": "equality", "filter": {"source": "a"}, "where": {"metadata.source": "a"}},
+    {"name": "several fields AND", "filter": {"source": "a", "year": 2024}, "where": {"metadata.source": "a", "metadata.year": 2024}},
+    {"name": "boolean", "filter": {"draft": false}, "where": {"metadata.draft": false}},
+    {"name": "comparison", "filter": {"year": {"$gte": 2020, "$lt": 2025}}, "where": {"metadata.year": {"$gte": 2020, "$lt": 2025}}},
+    {"name": "$eq and $ne", "filter": {"a": {"$eq": 1}, "b": {"$ne": "x"}}, "where": {"metadata.a": {"$eq": 1}, "metadata.b": {"$ne": "x"}}},
+    {"name": "membership", "filter": {"tag": {"$in": ["x", "y"]}, "lang": {"$nin": ["fr"]}}, "where": {"metadata.tag": {"$in": ["x", "y"]}, "metadata.lang": {"$nin": ["fr"]}}},
+    {"name": "presence", "filter": {"author": {"$exists": true}}, "where": {"metadata.author": {"$exists": true}}},
+    {"name": "string match", "filter": {"title": {"$contains": "graph", "$startsWith": "A"}, "file": {"$endsWith": ".md"}}, "where": {"metadata.title": {"$contains": "graph", "$startsWith": "A"}, "metadata.file": {"$endsWith": ".md"}}},
+    {"name": "or", "filter": {"$or": [{"source": "a"}, {"year": {"$gt": 2000}}]}, "where": {"$or": [{"metadata.source": "a"}, {"metadata.year": {"$gt": 2000}}]}},
+    {"name": "and with field", "filter": {"$and": [{"a": 1}, {"b": 2}], "c": 3}, "where": {"$and": [{"metadata.a": 1}, {"metadata.b": 2}], "metadata.c": 3}},
+    {"name": "not", "filter": {"$not": {"source": "a"}}, "where": {"$not": {"metadata.source": "a"}}},
+    {"name": "empty", "filter": {}, "where": {}}
+  ],
+  "errors": [
+    {"name": "unknown operator", "filter": {"a": {"$regex": "x"}}},
+    {"name": "unknown logic operator", "filter": {"$nor": [{"a": 1}]}},
+    {"name": "$in needs a list", "filter": {"a": {"$in": "x"}}},
+    {"name": "$and needs a list", "filter": {"$and": {"a": 1}}},
+    {"name": "$exists needs a boolean", "filter": {"a": {"$exists": 1}}},
+    {"name": "object operand", "filter": {"a": {"b": 1}}},
+    {"name": "null operand", "filter": {"a": null}},
+    {"name": "string match needs a string", "filter": {"a": {"$contains": 1}}}
+  ]
+}
