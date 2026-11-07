@@ -148,6 +148,10 @@ one language are read by the same language. The record layout, not the
 serialization, is shared: either package can list, count and delete any
 thread.
 
+The checkpoint label is configurable; channel values and pending writes
+always use `<label>_BLOB` and `<label>_WRITE`. The labels below are the
+defaults.
+
 Checkpoint: label `LG_CHECKPOINT`
 
 | Property | Type | Content |
