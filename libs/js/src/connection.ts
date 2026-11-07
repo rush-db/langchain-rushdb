@@ -1,5 +1,5 @@
 /** Client construction and the record helpers every component shares. */
-import RushDB from '@rushdb/javascript-sdk'
+import RushDB, { type Transaction } from '@rushdb/javascript-sdk'
 
 export type Client = InstanceType<typeof RushDB>
 export type Row = Record<string, any>
@@ -92,8 +92,6 @@ export async function transact(
 ): Promise<void> {
   if (!remove.length && !create.some(([, rows]) => rows.length)) return
   for (let attempt = 0; attempt < CONFLICT_RETRIES; attempt += 1) {
-    // Commit and roll back through `client`: the SDK's `Transaction` methods
-    // use the most recently created client, not the one that began it.
     const tx = await client.tx.begin()
     let committing = false
     try {
@@ -112,9 +110,9 @@ export async function transact(
   }
 }
 
-async function rollback(client: Client, tx: unknown, cause: unknown): Promise<void> {
+async function rollback(client: Client, tx: Transaction, cause: unknown): Promise<void> {
   try {
-    await client.tx.rollback(tx as never)
+    await client.tx.rollback(tx)
   } catch (error) {
     console.warn(`[@rushdb/langchain] rollback after ${String(cause)} also failed: ${String(error)}`)
   }

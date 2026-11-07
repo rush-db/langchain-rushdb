@@ -311,7 +311,7 @@ export class RushDBStore extends BaseStore {
         limit: pool
       }
       if (Object.keys(where).length) params.where = where
-      const result = await this.client.records.vectorSearch(params as any)
+      const result = await this.client.records.vectorSearch(params)
       const hits = result.data.map((r: any) => r.data as Row)
       const best = new Map<string, [string, string, number]>()
       for (const hit of hits) {

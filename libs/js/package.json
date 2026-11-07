@@ -43,7 +43,7 @@
     "prepack": "pnpm build"
   },
   "dependencies": {
-    "@rushdb/javascript-sdk": "^3.3.0"
+    "@rushdb/javascript-sdk": "^3.3.1"
   },
   "peerDependencies": {
     "@langchain/core": "^1.0.0",

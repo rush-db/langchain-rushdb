@@ -300,7 +300,7 @@ name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/79/66800aadf48771f6b62f7eb014e352e5d06856655206165d775e675a02c9/exceptiongroup-1.3.1.tar.gz", hash = "sha256:8b412432c6055b0b7d14c310000ae93352ed6754f70fa8f7c34141f91c4e3219", size = 30371, upload-time = "2025-11-21T23:01:54.787Z" }
 wheels = [
@@ -529,7 +529,7 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=1.0,<2" },
     { name = "langgraph", specifier = ">=1.0,<2" },
     { name = "langgraph-checkpoint", specifier = ">=4.0,<5" },
-    { name = "rushdb", specifier = ">=3.2.0,<4" },
+    { name = "rushdb", specifier = ">=3.2.1,<4" },
 ]
 
 [package.metadata.requires-dev]
@@ -1753,11 +1753,11 @@ wheels = [
 
 [[package]]
 name = "rushdb"
-version = "3.2.0"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/6b/74/8046c92e2ce95d31dfe0fcacdf7ac743e6a824a3694ce4a3f52e20b17b61/rushdb-3.2.0.tar.gz", hash = "sha256:2d634eddcc6734a163d0ac3e668b2e27b27fb3e5920afa127a8ab19ce25f69ef", size = 136698, upload-time = "2026-11-07T12:42:17.799Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/3f/19699742ba3b909dde1385b4d4090f229b60e230bc3a4295b68283bd4ea4/rushdb-3.2.1.tar.gz", hash = "sha256:35678cbefe68f96adea3e65efa99fa4e075be6553dbe051c58b70e4538a4e16a", size = 137581, upload-time = "2026-11-07T19:27:51.277Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/c7/82c4df7cec8e183eab26b0d8fed79a8bc5e241877c84982ff561386edeff/rushdb-3.2.0-py3-none-any.whl", hash = "sha256:7501a3201e805ca6fc2ac6898fc6e5cff7bfbf5d6b348ba9dbc6a2146a8d3b9f", size = 67688, upload-time = "2026-11-07T12:42:16.345Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/03/d6428fbbcde8d0ae1950ede75b95ce19b307a2eb0083a68465d9391f6386/rushdb-3.2.1-py3-none-any.whl", hash = "sha256:668103f768b3a1f5bf675d3a42837fbb238fcdadc750031d224f45fd1b89a0e4", size = 67693, upload-time = "2026-11-07T19:27:49.761Z" },
 ]
 
 [[package]]

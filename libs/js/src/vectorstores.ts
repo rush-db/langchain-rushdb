@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { Document, type DocumentInterface } from '@langchain/core/documents'
 import type { EmbeddingsInterface } from '@langchain/core/embeddings'
 import { VectorStore } from '@langchain/core/vectorstores'
+import type { CreateEmbeddingIndexParams } from '@rushdb/javascript-sdk'
 
 import {
   type Client,
@@ -138,12 +139,13 @@ export class RushDBVectorStore extends VectorStore {
         return
       }
     }
-    const params: Row = { label: this.label, propertyName: this.textProperty }
+    const params: CreateEmbeddingIndexParams = { label: this.label, propertyName: this.textProperty }
     if (!this.managed) {
-      const dims = dimensions ?? (await this.embeddings.embedQuery('dimension probe')).length
-      Object.assign(params, { external: true, dimensions: dims, similarityFunction: this.similarity })
+      params.external = true
+      params.dimensions = dimensions ?? (await this.embeddings.embedQuery('dimension probe')).length
+      params.similarityFunction = this.similarity
     }
-    await this.client.ai.indexes.create(params as any)
+    await this.client.ai.indexes.create(params)
   }
 
   private async ensureTextIndex(): Promise<void> {
@@ -275,7 +277,7 @@ export class RushDBVectorStore extends VectorStore {
   async runSearch(params: Row): Promise<Array<[Document, number]>> {
     const vector = params.queryVector as number[] | undefined
     await this.ensureIndexes(vector?.length)
-    const result = await this.client.records.vectorSearch(params as any)
+    const result = await this.client.records.vectorSearch(params)
     return result.data.map((record: any) => {
       const row = record.data as Row
       return [this.document(row), Number(row.__score ?? 0)]

@@ -18,7 +18,7 @@ keywords = [
   "self-hosted",
 ]
 dependencies = [
-  "rushdb>=3.2.0,<4",
+  "rushdb>=3.2.1,<4",
   "langchain-core>=1.0,<2",
   "langgraph-checkpoint>=4.0,<5",
   "langgraph>=1.0,<2",
