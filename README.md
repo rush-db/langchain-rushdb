@@ -38,4 +38,25 @@ export RUSHDB_TEST_API_KEY=...   # optional: RushDB Cloud test project
 (cd libs/js && pnpm test)
 ```
 
+## Releasing
+
+Each package is released by pushing a tag that matches its version:
+`python-v<version>` for `libs/python/pyproject.toml`, or `js-v<version>` for
+`libs/js/package.json`. The release workflow runs CI, including RushDB Cloud,
+and then publishes with trusted publishing (OIDC). No registry token is stored.
+
+```bash
+git tag python-v0.1.0 && git push origin python-v0.1.0
+git tag js-v0.1.0 && git push origin js-v0.1.0
+```
+
+One-time setup, described in [`release.yml`](.github/workflows/release.yml):
+
+- **PyPI:** register a trusted publisher for `langchain-rushdb`. Before the project
+  exists, use a pending publisher.
+- **npm:** you can configure trusted publishing only once the package exists.
+  Publish the first version by hand (`cd libs/js && pnpm build && npm publish`,
+  logged in with publish rights on `@rushdb`), then set it up. After that, every
+  version goes through the tag.
+
 Apache-2.0.

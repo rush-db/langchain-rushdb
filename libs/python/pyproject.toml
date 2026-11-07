@@ -27,7 +27,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/rush-db/langchain-rushdb"
 Repository = "https://github.com/rush-db/langchain-rushdb"
-Documentation = "https://docs.rushdb.com/integrations/langchain"
+Documentation = "https://docs.rushdb.com/connect/langchain"
 
 [dependency-groups]
 dev = [

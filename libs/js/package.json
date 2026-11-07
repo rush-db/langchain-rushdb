@@ -21,7 +21,7 @@
     "url": "git+https://github.com/rush-db/langchain-rushdb.git",
     "directory": "libs/js"
   },
-  "homepage": "https://docs.rushdb.com/integrations/langchain",
+  "homepage": "https://docs.rushdb.com/connect/langchain",
   "keywords": [
     "rushdb",
     "langchain",
@@ -63,5 +63,12 @@
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "bugs": {
+    "url": "https://github.com/rush-db/langchain-rushdb/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }
