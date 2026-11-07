@@ -1,6 +1,6 @@
 {
   "name": "@rushdb/langchain",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "LangChain and LangGraph integration for RushDB: vector store, hybrid retriever, long-term memory store and checkpointer, on RushDB Cloud or self-hosted",
   "license": "Apache-2.0",
   "type": "module",
