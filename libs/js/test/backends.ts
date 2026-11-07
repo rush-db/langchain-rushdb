@@ -39,7 +39,7 @@ export function makeClient(backend: Backend): Client | undefined {
   return undefined
 }
 
-/** A suffix that keeps one test's labels apart from every other run. */
+/** A random id, for multitenant test scopes. */
 export function unique(): string {
   return randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()
 }
@@ -67,17 +67,17 @@ export function describeBackends(name: string, body: (client: () => Client, back
 }
 
 /**
- * Delete a test's records and the vector and text indexes on its labels.
- * Every test uses fresh labels; leaving their indexes behind would exhaust the
- * engine's 256 vector spaces per tenant.
+ * A test label that is stable across runs of one CI job. RushDB never reclaims
+ * a dropped vector index's space (256 per tenant), so tests reuse their labels,
+ * and their indexes, instead of minting new ones. `RUSHDB_TEST_LABEL_SUFFIX`
+ * tells concurrent jobs apart; CI serializes runs, so one job's labels are
+ * never used twice at once.
  */
-export async function dropLabels(client: Client, ...labels: string[]): Promise<void> {
-  const wanted = new Set(labels)
-  for (const label of labels) await client.records.delete({ labels: [label] } as any)
-  for (const index of ((await client.ai.indexes.find()).data ?? []) as any[]) {
-    if (wanted.has(index.label)) await client.ai.indexes.delete(index.id)
-  }
-  for (const index of ((await client.textIndexes.find()).data ?? []) as any[]) {
-    if (wanted.has(index.label)) await client.textIndexes.delete(index.name)
-  }
+export function label(base: string): string {
+  return `${base}_${process.env.RUSHDB_TEST_LABEL_SUFFIX ?? 'LOCAL_JS'}`
+}
+
+/** Delete every record of `labels`; their indexes stay for the next run. */
+export async function clearLabels(client: Client, ...labels: string[]): Promise<void> {
+  for (const name of labels) await client.records.delete({ labels: [name] } as any)
 }

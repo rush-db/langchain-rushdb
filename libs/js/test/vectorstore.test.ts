@@ -3,7 +3,7 @@ import { Document } from '@langchain/core/documents'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { FilterError, RushDBHybridRetriever, RushDBVectorStore } from '../src/index.js'
-import { describeBackends, dropLabels, unique } from './backends.js'
+import { clearLabels, describeBackends, label } from './backends.js'
 import { KeywordEmbeddings } from './keyword-embeddings.js'
 
 const DOCS = [
@@ -19,14 +19,15 @@ describeBackends('RushDBVectorStore', (makeClient) => {
   beforeEach(async () => {
     store = new RushDBVectorStore(new KeywordEmbeddings(), {
       client: makeClient(),
-      label: `LC_VS_${unique()}`,
+      label: label('LC_VS'),
       hybrid: true,
       textIndexConsistency: 'immediate'
     })
+    await clearLabels(store.client, store.label)
   })
 
   afterEach(async () => {
-    await dropLabels(store.client, store.label)
+    await clearLabels(store.client, store.label)
   })
 
   // ── the behaviours LangChain's standard vector store suite checks ──────
@@ -132,7 +133,7 @@ describeBackends('RushDBVectorStore', (makeClient) => {
   it('needs a text index for hybrid retrieval', async () => {
     const plain = new RushDBVectorStore(new KeywordEmbeddings(), {
       client: store.client,
-      label: `LC_NH_${unique()}`
+      label: label('LC_NH')
     })
     await expect(new RushDBHybridRetriever({ vectorstore: plain }).invoke('x')).rejects.toThrow(/hybrid: true/)
   })

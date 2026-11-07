@@ -155,7 +155,9 @@ class RushDBStore(BaseStore):
             minutes = row.get("ttl_minutes")
             if isinstance(minutes, (int, float)):
                 expires = iso(now + timedelta(minutes=minutes))
-                self.client.records.update(row["__id"], {"expires_at": expires})
+                self.client.records.update(
+                    row["__id"], {"expires_at": expires}, label=self.item_label
+                )
                 row["expires_at"] = expires
 
     # ── put / delete ───────────────────────────────────────────────────────

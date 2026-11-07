@@ -7,15 +7,17 @@ import { expect, it } from 'vitest'
 
 import type { Client } from '../src/connection.js'
 import { RushDBSaver } from '../src/checkpoint.js'
-import { describeBackends, dropLabels, unique } from './backends.js'
+import { clearLabels, describeBackends, label } from './backends.js'
 
-/** A saver on labels of its own, so concurrent runs on one project never meet. */
-function freshSaver(client: Client): RushDBSaver {
-  return new RushDBSaver({ client, label: `LG_CP_${unique()}` })
+/** A saver on this job's checkpoint labels, emptied first. */
+async function freshSaver(client: Client): Promise<RushDBSaver> {
+  const saver = new RushDBSaver({ client, label: label('LG_CP') })
+  await clear(saver)
+  return saver
 }
 
-async function drop(saver: RushDBSaver): Promise<void> {
-  await dropLabels(saver.client, saver.label, saver.blobLabel, saver.writeLabel)
+async function clear(saver: RushDBSaver): Promise<void> {
+  await clearLabels(saver.client, saver.label, saver.blobLabel, saver.writeLabel)
 }
 
 const State = Annotation.Root({
@@ -41,16 +43,16 @@ describeBackends('RushDBSaver', (makeClient) => {
   validate({
     checkpointerName: 'RushDBSaver',
     async createCheckpointer() {
-      return freshSaver(client)
+      return await freshSaver(client)
     },
     async destroyCheckpointer(saver: RushDBSaver) {
-      await drop(saver)
+      await clear(saver)
     }
   })
 
   it('resumes an interrupted thread from a fresh saver', async () => {
     const thread = { configurable: { thread_id: `t-${randomUUID()}` } }
-    const first = freshSaver(client)
+    const first = await freshSaver(client)
     const out = await graph(first).invoke({ log: [] }, thread)
     expect(out).toHaveProperty('__interrupt__')
     const second = graph(new RushDBSaver({ client, label: first.label }))
@@ -60,11 +62,11 @@ describeBackends('RushDBSaver', (makeClient) => {
     const history = []
     for await (const snapshot of second.getStateHistory(thread)) history.push(snapshot)
     expect(history.length).toBeGreaterThanOrEqual(3)
-    await drop(first)
+    await clear(first)
   })
 
   it('deletes a thread', async () => {
-    const saver = freshSaver(client)
+    const saver = await freshSaver(client)
     const threadId = `t-${randomUUID()}`
     await graph(saver).invoke({ log: [] }, { configurable: { thread_id: threadId } })
     await saver.deleteThread(threadId)
@@ -75,6 +77,6 @@ describeBackends('RushDBSaver', (makeClient) => {
       const rows = await client.records.find({ labels: [label], where: { thread_id: threadId } } as any)
       expect(rows.total).toBe(0)
     }
-    await drop(saver)
+    await clear(saver)
   })
 })

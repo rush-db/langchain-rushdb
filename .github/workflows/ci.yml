@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Test labels are stable per job (RushDB never reclaims a dropped vector
+# index's space), so two runs must not share them at once.
+concurrency:
+  group: rushdb-integration-tests
+  cancel-in-progress: false
+
 env:
   RUSHDB_IMAGE: rushdb/rushdb:3.0.4
   RUSHDB_TEST_ENGINE_URL: http://127.0.0.1:3917
@@ -22,6 +28,7 @@ jobs:
   python:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python: ['3.10', '3.13']
     defaults:
@@ -38,7 +45,10 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run mypy langchain_rushdb
       - name: Test (every backend required)
+        env:
+          RUSHDB_TEST_LABEL_SUFFIX: PY${{ matrix.python }}
         run: |
+          export RUSHDB_TEST_LABEL_SUFFIX=${RUSHDB_TEST_LABEL_SUFFIX//./}
           export RUSHDB_TEST_REQUIRE=self_hosted,self_hosted_multitenant${RUSHDB_TEST_API_KEY:+,cloud}
           uv run pytest -q
 
@@ -65,6 +75,8 @@ jobs:
       - run: pnpm build
       - run: pnpm types:check
       - name: Test (every backend required)
+        env:
+          RUSHDB_TEST_LABEL_SUFFIX: JS
         run: |
           export RUSHDB_TEST_REQUIRE=self_hosted,self_hosted_multitenant${RUSHDB_TEST_API_KEY:+,cloud}
           pnpm test

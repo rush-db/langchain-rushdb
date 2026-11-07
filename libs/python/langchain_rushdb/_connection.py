@@ -98,7 +98,8 @@ def create_rows(
     )
 
 
-CONFLICT_RETRIES = 8
+CONFLICT_RETRIES = 10
+CONFLICT_BACKOFF_CAP = 2.0
 
 
 def transact(
@@ -134,7 +135,7 @@ def transact(
                 or attempt == CONFLICT_RETRIES - 1
             ):
                 raise
-            time.sleep(0.02 * 2**attempt * (1 + random.random()))
+            time.sleep(min(CONFLICT_BACKOFF_CAP, 0.05 * 2**attempt) * (1 + random.random()))
 
 
 def _rollback(client: RushDB, tx: Any, cause: BaseException) -> None:

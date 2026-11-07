@@ -2,25 +2,25 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 import { RushDBStore } from '../src/index.js'
-import { describeBackends, dropLabels, unique } from './backends.js'
+import { clearLabels, describeBackends, label } from './backends.js'
 import { KeywordEmbeddings } from './keyword-embeddings.js'
 import { sleep } from '../src/connection.js'
 
 describeBackends('RushDBStore', (makeClient) => {
   let store: RushDBStore
 
-  beforeEach(() => {
-    const id = unique()
+  beforeEach(async () => {
     store = new RushDBStore({
       client: makeClient(),
-      itemLabel: `LG_ITEM_${id}`,
-      vectorLabel: `LG_VEC_${id}`,
+      itemLabel: label('LG_ITEM'),
+      vectorLabel: label('LG_VEC'),
       index: { dims: 4, embeddings: new KeywordEmbeddings(), fields: ['text'] }
     })
+    await clearLabels(store.client, store.itemLabel, store.vectorLabel)
   })
 
   afterEach(async () => {
-    await dropLabels(store.client, store.itemLabel, store.vectorLabel)
+    await clearLabels(store.client, store.itemLabel, store.vectorLabel)
   })
 
   it('round-trips put and get', async () => {

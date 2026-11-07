@@ -6,7 +6,7 @@ import RushDB from '@rushdb/javascript-sdk'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { RushDBStore, RushDBVectorStore } from '../src/index.js'
-import { dropLabels, unique } from './backends.js'
+import { clearLabels, label } from './backends.js'
 import { KeywordEmbeddings } from './keyword-embeddings.js'
 
 const engineUrl = process.env.RUSHDB_TEST_ENGINE_URL
@@ -16,11 +16,11 @@ const pythonProject = fileURLToPath(new URL('../../python', import.meta.url))
 const script = fileURLToPath(new URL('./cross/write_from_python.py', import.meta.url))
 
 describe.skipIf(!engineUrl || !hasUv)('Python → JS [self_hosted]', () => {
-  const suffix = unique()
+  const suffix = label('X')
   const client = new RushDB(token, { direct: true, engineUrl: engineUrl as string })
 
   afterAll(async () => {
-    await dropLabels(client, `LC_X_${suffix}`, `LG_XI_${suffix}`, `LG_XV_${suffix}`)
+    await clearLabels(client, `LC_X_${suffix}`, `LG_XI_${suffix}`, `LG_XV_${suffix}`)
   })
 
   it('reads what Python wrote', async () => {

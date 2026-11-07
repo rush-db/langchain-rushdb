@@ -10,24 +10,30 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 
 from langchain_rushdb import RushDBSaver
-from tests.conftest import drop_labels
+from tests.conftest import clear_labels, label
 
 
 @pytest.fixture
-def saver_label(client, unique):
-    """A label of this test's own, so concurrent runs on one project never meet."""
-    label = f"LG_CP_{unique}"
-    yield label
-    drop_labels(client, label, f"{label}_BLOB", f"{label}_WRITE")
+def saver_label(client):
+    name = label("LG_CP")
+    _clear(client, name)
+    yield name
+    _clear(client, name)
 
 
-async def test_conformance(client, unique):
+def _clear(client, name):
+    clear_labels(client, name, f"{name}_BLOB", f"{name}_WRITE")
+
+
+async def test_conformance(client):
+    name = label("LG_CF")
+
     @checkpointer_test(name="RushDBSaver")
     async def saver():
-        # Every conformance test gets its own labels: some list all checkpoints.
-        label = f"LG_CF_{unique}_{uuid.uuid4().hex[:6].upper()}"
-        yield RushDBSaver(client=client, label=label)
-        drop_labels(client, label, f"{label}_BLOB", f"{label}_WRITE")
+        # Some conformance tests list every checkpoint: start each one empty.
+        _clear(client, name)
+        yield RushDBSaver(client=client, label=name)
+        _clear(client, name)
 
     report = await validate(saver)
     report.print_report()
@@ -77,6 +83,6 @@ def test_delete_thread(client, saver_label):
     graph.invoke({"log": []}, {"configurable": {"thread_id": thread_id}})
     saver.delete_thread(thread_id)
     assert list(saver.list({"configurable": {"thread_id": thread_id}})) == []
-    for label in (saver.label, saver.blob_label, saver.write_label):
-        rows = client.records.find({"labels": [label], "where": {"thread_id": thread_id}})
+    for name in (saver.label, saver.blob_label, saver.write_label):
+        rows = client.records.find({"labels": [name], "where": {"thread_id": thread_id}})
         assert rows.total == 0

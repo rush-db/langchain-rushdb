@@ -50,24 +50,18 @@ def client(request):
     return instance
 
 
-@pytest.fixture
-def unique() -> str:
-    """A suffix that keeps one test's labels apart from every other run."""
-    return uuid.uuid4().hex[:10].upper()
+def label(base: str) -> str:
+    """A test label that is stable across runs of one CI job.
 
-
-def drop_labels(client: RushDB, *labels: str) -> None:
-    """Delete a test's records and the vector and text indexes on its labels.
-
-    Every test uses fresh labels; leaving their indexes behind would exhaust
-    the engine's 256 vector spaces per tenant.
+    RushDB never reclaims a dropped vector index's space (256 per tenant), so
+    tests reuse their labels, and their indexes, instead of minting new ones.
+    ``RUSHDB_TEST_LABEL_SUFFIX`` tells concurrent jobs apart; CI serializes
+    runs, so one job's labels are never used twice at once.
     """
-    wanted = set(labels)
-    for label in labels:
-        client.records.delete({"labels": [label]})
-    for index in client.ai.indexes.find().data or []:
-        if index.get("label") in wanted:
-            client.ai.indexes.delete(index["id"])
-    for index in client.text_indexes.find().data or []:
-        if index.get("label") in wanted:
-            client.text_indexes.delete(index["name"])
+    return f"{base}_{os.environ.get('RUSHDB_TEST_LABEL_SUFFIX', 'LOCAL_PY')}"
+
+
+def clear_labels(client: RushDB, *labels: str) -> None:
+    """Delete every record of ``labels``; their indexes stay for the next run."""
+    for name in labels:
+        client.records.delete({"labels": [name]})
